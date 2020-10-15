@@ -2,25 +2,53 @@ require 'pry'
 require 'open-uri'
 require_relative './weather_station.rb'
 
-class BatchBrew
-  def initialize
-    Thread.current[:batch] = {}
-    Thread.current[:loaded] = {}
-    @thread_store = :batch
-    @loaded_thread_store = :loaded
+class ThreadStore
+
+  attr_reader :store_name
+
+  def initialize(store_name)
+    @store_name = store_name
+    Thread.current[store_name] = {}
+  end
+  
+  def []=(key, value)
+    Thread.current[store_name][key] = value
   end
 
-  def for(block_location, key, &block)
-    unless Thread.current[@thread_store][block_location]
-      Thread.current[@thread_store][block_location] = {}
-    end
-    Thread.current[@thread_store][block_location][key] ||= block
-    Resolver.new(@thread_store, @loaded_thread_store, block_location, key)
+  def [](key)
+    Thread.current[store_name][key]
+  end
+
+  def dig(*keys)
+    Thread.current[store_name].dig(*keys)
   end
 
 end
 
+class BatchBrew
+
+  attr_reader :thread_store, :loaded_thread_store
+
+  def initialize
+    @thread_store = ThreadStore.new(:batch)
+    @loaded_thread_store = ThreadStore.new(:loaded_batch)
+  end
+
+  def for(block_location, key, &block)
+    unless thread_store[block_location]
+      thread_store[block_location] = {}
+    end
+    thread_store[block_location][key] ||= block
+    Resolver.new(thread_store, loaded_thread_store, block_location, key)
+  end
+
+end
+
+
 class Resolver
+
+  attr_reader :thread_store, :loaded_thread_store, :block_location, :key
+
   def initialize(thread_store, loaded_thread_store, block_location, key)
     @thread_store = thread_store
     @loaded_thread_store = loaded_thread_store
@@ -29,14 +57,13 @@ class Resolver
   end
 
   def resolve
-    if Thread.current[@loaded_thread_store].dig(@block_location, @key)
-      Thread.current[@loaded_thread_store][@block_location][@key]
+    if loaded_thread_store.dig(block_location, key)
+      loaded_thread_store[block_location][key]
     else
-      Thread
-        .current[@thread_store][@block_location][@key]
-        .call(Thread.current[@thread_store][@block_location].keys)
-        .then {|result| Thread.current[@loaded_thread_store][@block_location] = result }
-        .then {|result| result[@key]}
+      thread_store[block_location][key]
+        .call(thread_store[block_location].keys)
+        .then {|result| loaded_thread_store[block_location] = result }
+        .then {|result| result[key]}
     end
   end
 end
@@ -93,3 +120,4 @@ resolve(hash2)
 t2 = Time.new
 
 puts t2 - t1
+pp hash2
