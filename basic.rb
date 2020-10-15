@@ -50,3 +50,4 @@ resolve(hash1)
 t2 = Time.new
 
 puts t2 - t1
+pp hash1
