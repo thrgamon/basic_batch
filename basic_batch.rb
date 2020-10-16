@@ -1,5 +1,4 @@
 require 'pry'
-require 'open-uri'
 require_relative './weather_station.rb'
 
 class ThreadStore

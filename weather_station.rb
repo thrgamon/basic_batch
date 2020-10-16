@@ -1,3 +1,5 @@
+require 'open-uri'
+
 class WeatherStation
   def get_weather_for_location(location)
     puts "Launching weather balloon"
